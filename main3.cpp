@@ -85,21 +85,21 @@ bool is_higher_priority(const Job& a, const Job& b, Algorithm algo, const vector
         if(a.period != b.period) {
             return a.period < b.period;
         }
-        else if(algo == DM) {
+    }
+    else if(algo == DM) {
             //Deadline Monotonic: shorter relative deadline = higher priority
             int rel_a = procs[a.process_id - 1].relative_deadline;
             int rel_b = procs[b.process_id - 1].relative_deadline;
             if(rel_a != rel_b) {
                 return rel_a < rel_b;
             }
-            else if(algo == EDF) {
+    }
+    else if(algo == EDF) {
                 //Earliest Deadline First: dynamic, earlier absolute deadline = higher priority
                 if(a.absolute_deadline != b.absolute_deadline) {
                     return a.absolute_deadline < b.absolute_deadline;
                 }
             }
-        }
-    }
     //Tie-breaker: lower process ID
     return a.process_id < b.process_id;
 }
@@ -156,7 +156,7 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
         int event_time = current_event.time;
 
         //Advance simulation clock and accumulate CPU busy time if running a job
-        if(cpu_busy) {
+        if(cpu_busy && event_time > current_time) {
             int elapsed = event_time - current_time;
             current_job.remaining_time -= elapsed;
             total_cpu_busy_time += elapsed;
@@ -169,14 +169,12 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
 
             //Check deadline miss on arrival (if previous instance did not finish before new arrival)
             for(const auto& r_job : ready_queue) {
-                if(r_job.process_id == new_job.process_id) {
-                    if(feasible) {
+                if(r_job.process_id == new_job.process_id && feasible) {
                         feasible = false;
                         failure_time = current_time;
                         failed_process_id = new_job.process_id;
                     }
                 }
-            }
 
             ready_queue.push_back(new_job);
 
@@ -195,6 +193,31 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
                 event_queue.push({ next_job.release_time, PROCESS_ARRIVAL, next_job });
             }
         }
+
+        //Preemption check if CPU is busy
+        if(cpu_busy) {
+            Job new_job = current_event.job;
+            //If newly arrived job has higher priority than currently running job
+            if(is_higher_priority(new_job, current_job, algo, processes)) {
+                //Put current job back in ready queue
+                ready_queue.push_back(current_job);
+                cpu_busy = false;
+
+                //Remove stale completion event for current_job
+                vector<Event> temp_events;
+                while(!event_queue.empty()) {
+                    Event ev = event_queue.top();
+                    event_queue.pop();
+                    if(!(ev.type == PROCESS_COMPLETION && ev.job.process_id == current_job.process_id && ev.job.job_id == current_job.job_id)) {
+                        temp_events.push_back(ev);
+                    }
+                }
+                for(const auto& ev: temp_events) {
+                    event_queue.push(ev);
+                }
+            }
+        }
+
         else if(current_event.type == PROCESS_COMPLETION) {
             cpu_busy = false;
             finish_records.push_back({ current_job.process_id, current_job.job_id, current_time });
@@ -202,7 +225,7 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
             //Check if deadline was missed
             if(current_time > current_job.absolute_deadline && feasible) {
                 feasible = false;
-                failure_time + current_time;
+                failure_time = current_time;
                 failed_process_id = current_job.process_id;
             }
         }
@@ -275,9 +298,9 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
                 if(rec.process_id == p.id) {
                     if(!first) {
                         cout << ", ";
+                    }
                         cout << rec.finish_time;
                         first = false;
-                    }
                 }
              }
              cout << "]\n";

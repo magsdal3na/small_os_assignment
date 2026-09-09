@@ -200,19 +200,23 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
         }
 
         //Preemption check if CPU is busy
-        if(cpu_busy) {
+        if(current_event.type == PROCESS_ARRIVAL && cpu_busy) {
+
             Job new_job = current_event.job;
             //If newly arrived job has higher priority than currently running job
             if(is_higher_priority(new_job, current_job, algo, processes)) {
                 //Put current job back in ready queue
                 ready_queue.push_back(current_job);
+
                 cpu_busy = false;
 
                 //Remove stale completion event for current_job
                 vector<Event> temp_events;
+
                 while(!event_queue.empty()) {
                     Event ev = event_queue.top();
                     event_queue.pop();
+                    
                     if(!(ev.type == PROCESS_COMPLETION && ev.job.process_id == current_job.process_id && ev.job.job_id == current_job.job_id)) {
                         temp_events.push_back(ev);
                     }
@@ -224,14 +228,16 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
         }
 
         else if(current_event.type == PROCESS_COMPLETION) {
+
             cpu_busy = false;
-            finish_records.push_back({ current_job.process_id, current_job.job_id, current_time });
+
+            finish_records.push_back({ current_event.job.process_id, current_event.job.job_id, current_time });
 
             //Check if deadline was missed
-            if(current_time > current_job.absolute_deadline && feasible) {
+            if(current_time > current_event.job.absolute_deadline && feasible) {
                 feasible = false;
                 failure_time = current_time;
-                failed_process_id = current_job.process_id;
+                failed_process_id = current_event.job.process_id;
             }
         }
 
@@ -285,38 +291,35 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
 }
 
 int main() {
-    //Create sample input file
-    ofstream outfile("input.txt");
-    if(!outfile) {
-        cerr << "Error creating input file.\n";
-        return 1;
-    }
 
-    //Header: Number of processes, process switch overhead
-    outfile << "5 0\n";
-    //Process details: process number, arrival time, relative deadline, period
-    outfile << "1 0 8 12\n";
-    outfile << "2 0 10 20\n";
-    outfile << "3 0 10 25\n";
-    outfile << "4 0 15 28\n";
-    outfile << "5 0 20 32\n";
-    outfile.close();
+    string filename;
 
-    //Read processes from input file
-    ifstream infile("input.txt");
+    cout << "There are three scenario files for this program:" << endl;
+    cout << "scenario1.txt, scenario2.txt, scenario3.txt" << endl;
+    cout << "Please enter the name of the file to use below: " << endl;
+
+    cin >> filename;
+
+    ifstream infile(filename);
+
     if(!infile) {
-        cerr << "Error opening input.txt\n";
+        cerr << "error opening input file.\n";
         return 1;
     }
 
     int num_processes, process_switch_overhead;
     infile >> num_processes >> process_switch_overhead;
 
-    vector<Process> processes(num_processes);
-
     //Assigns execution/service times according to assignment recommendations:
     //Service times chosen to keep total CPU load near feasible boundaries
-    vector<int> service_times = { 3, 4, 3, 2, 2 };
+    //Pulls service times from .txt file
+    vector<int> service_times(num_processes);
+
+    for(int i = 0; i < num_processes; ++i) {
+        infile >> service_times[i];
+    }
+
+    vector<Process> processes(num_processes);
 
     for(int i = 0; i < num_processes; ++i) {
         infile >> processes[i].id

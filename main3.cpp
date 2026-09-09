@@ -149,8 +149,13 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
 
     vector<JobFinishRecord> finish_records;
 
-    while(!event_queue.empty() && current_time <= max_sim_time) {
+    while(!event_queue.empty()) {
         Event current_event = event_queue.top();
+
+        if(current_event.time > max_sim_time) {
+            break;
+        }
+        
         event_queue.pop();
 
         int event_time = current_event.time;
@@ -231,47 +236,19 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
         }
 
         //Check preemption or scheduling next job
-        if(!ready_queue.empty()) {
+        if(!cpu_busy && !ready_queue.empty()) {
             //Sort ready queue based on scheduling algorithm policy
             sort(ready_queue.begin(), ready_queue.end(), [&](const Job& a, const Job& b) {
                 return is_higher_priority(a, b, algo, processes);
             });
 
-            Job highest_prio_job = ready_queue.front();
+            current_job = ready_queue.front();
+            ready_queue.erase(ready_queue.begin());
 
-            if(!cpu_busy) {
-                //Dispatch highest priority job
-                current_job = highest_prio_job;
-                ready_queue.erase(ready_queue.begin());
-                cpu_busy = true;
-                current_job_start_time = current_time;
-
-                event_queue.push({ current_time + current_job.remaining_time, PROCESS_COMPLETION, current_job });
-            }
-            else if(is_higher_priority(highest_prio_job, current_job, algo, processes)) {
-                //Preempt current running job
-                //Remove pending completion event for preempted job from queue
-                vector<Event> temp_events;
-                while(!event_queue.empty()) {
-                    Event ev = event_queue.top();
-                    event_queue.pop();
-                    if(!(ev.type == PROCESS_COMPLETION && ev.job.process_id == current_job.process_id && ev.job.job_id == current_job.job_id)) {
-                        temp_events.push_back(ev);
-                    }
-                }
-                for(const auto& ev : temp_events) {
-                    event_queue.push(ev);
-                }
-                //Push current job back to ready queue
-                ready_queue.push_back(current_job);
-
-                //Switch to new higher priority job
-                current_job = highest_prio_job;
-                ready_queue.erase(ready_queue.begin());
-                current_job_start_time = current_time;
-
-                event_queue.push({ current_time + current_job.remaining_time, PROCESS_COMPLETION, current_job });
-            }
+            cpu_busy = true;
+            current_job_start_time = current_time;
+            
+            event_queue.push({ current_time + current_job.remaining_time, PROCESS_COMPLETION, current_job });
         }
     }
 

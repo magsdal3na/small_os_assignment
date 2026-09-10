@@ -111,7 +111,7 @@ struct JobFinishRecord {
     int finish_time;
 };
 
-//Simulation Runner
+//Simulation Runner: main method used in the program
 void run_simulation(Algorithm algo, const vector<Process>& processes, int context_switch_overhead) {
     string algo_name;
     switch(algo) {
@@ -261,11 +261,11 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
     //---Output Results ---
     cout << algo_name << " Results:\n";
     if(feasible) {
-        cout << "Schedule feasible from 0 to " << max_sim_time << " units.\n";
+        cout << "Schedule was feasible for the entire " << max_sim_time << "-unit simulation.\n";
     }
     else {
-        cout << "Schedule feasible from 0 to " << failure_time << " units. At "
-             << failure_time << ", Process " << failed_process_id << " did not meet deadline.\n";
+        cout << "Schedule failed at " << failure_time << " units. "
+             << ", Process " << failed_process_id << " did not meet its deadline.\n";
     }
 
     cout << "CPU time took " << total_cpu_busy_time << " units out of " << max_sim_time << " total units.\n";
@@ -288,10 +288,26 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
              }
              cout << "]\n";
     }
+
+    //Summary of output for easier reading
+    cout << "\n======================================================\n";
+    cout << "Summary:" << endl;
+    cout << "Algorithm: " << algo_name << endl;
+    cout << "Simulation Time: " << max_sim_time << endl;
+    cout << "CPU Utilization: " << fixed << setprecision(2)
+         << (static_cast<double>(total_cpu_busy_time) / max_sim_time) * 100.0 << "%" << endl;
+    cout << "Result: " << 
 }
 
 int main() {
 
+    //The main method runs three different scenarios. These scenarios
+    //are based on different workloads. Scenario 1 is the basic scenario
+    //from the assignment and is a normal workload. Scenario 2 is made to
+    //simulate a heavy workload with higher CPU utilization. Scenario 3
+    //is meant to show a lower workload with different deadlines to show
+    //a much lower CPU utilization and output. These scenarios are chosen
+    //through input at the start of the simulation.
     string filename;
 
     cout << "There are three scenario files for this program:" << endl;

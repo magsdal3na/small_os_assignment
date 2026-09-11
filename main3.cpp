@@ -137,6 +137,7 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
         event_queue.push({ p.arrival_time, PROCESS_ARRIVAL, first_job });
     }
 
+    //Setting up variables 
     int current_time = 0;
     bool cpu_busy = false;
     Job current_job;
@@ -149,15 +150,20 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
 
     vector<JobFinishRecord> finish_records;
 
+    //Processes events in chronological order until the event queue is empty
+    //or the maximum simulation time is reached
     while(!event_queue.empty()) {
         Event current_event = event_queue.top();
 
+        //Stops processing events beyond the 500-unit simulation limit
         if(current_event.time > max_sim_time) {
             break;
         }
         
+        //Removes the event from the queue so it can be processed
         event_queue.pop();
 
+        //Stores the time at which this event occurs
         int event_time = current_event.time;
 
         //Advance simulation clock and accumulate CPU busy time if running a job
@@ -213,6 +219,9 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
                 //Remove stale completion event for current_job
                 vector<Event> temp_events;
 
+                //Removes the current job's old completion event from the queue.
+                //This is necessary when a job is preempted because its original
+                //completion time is no longer valid
                 while(!event_queue.empty()) {
                     Event ev = event_queue.top();
                     event_queue.pop();
@@ -221,6 +230,7 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
                         temp_events.push_back(ev);
                     }
                 }
+                //Restores all other events to the event queue
                 for(const auto& ev: temp_events) {
                     event_queue.push(ev);
                 }
@@ -265,7 +275,7 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
     }
     else {
         cout << "Schedule failed at " << failure_time << " units. "
-             << ", Process " << failed_process_id << " did not meet its deadline.\n";
+             << "Process " << failed_process_id << " did not meet its deadline.\n";
     }
 
     cout << "CPU time took " << total_cpu_busy_time << " units out of " << max_sim_time << " total units.\n";
@@ -288,15 +298,6 @@ void run_simulation(Algorithm algo, const vector<Process>& processes, int contex
              }
              cout << "]\n";
     }
-
-    //Summary of output for easier reading
-    cout << "\n======================================================\n";
-    cout << "Summary:" << endl;
-    cout << "Algorithm: " << algo_name << endl;
-    cout << "Simulation Time: " << max_sim_time << endl;
-    cout << "CPU Utilization: " << fixed << setprecision(2)
-         << (static_cast<double>(total_cpu_busy_time) / max_sim_time) * 100.0 << "%" << endl;
-    cout << "Result: " << 
 }
 
 int main() {
@@ -316,8 +317,11 @@ int main() {
 
     cin >> filename;
 
+    //Program takes in the file name and opens the 
+    //respective file
     ifstream infile(filename);
 
+    //Catches if the file doesn't open correctly
     if(!infile) {
         cerr << "error opening input file.\n";
         return 1;
@@ -331,12 +335,15 @@ int main() {
     //Pulls service times from .txt file
     vector<int> service_times(num_processes);
 
+    //Pulling in service times through a loop
     for(int i = 0; i < num_processes; ++i) {
         infile >> service_times[i];
     }
 
     vector<Process> processes(num_processes);
 
+    //Pulling in values from the file selected and
+    //assigning them to variables
     for(int i = 0; i < num_processes; ++i) {
         infile >> processes[i].id
                >> processes[i].arrival_time
@@ -345,6 +352,7 @@ int main() {
 
         processes[i].execution_time = service_times[i];
     }
+    //Closes file once all of the values are read
     infile.close();
 
     //Run simulation for RM, DM, and EDF 

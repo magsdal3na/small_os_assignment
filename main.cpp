@@ -181,6 +181,57 @@ int findLocation(const vector<int>& memory, int requiredSize, string strategy) {
     return -1;
 }
 
+//This function checks the waitingJobs queue to use during
+//the simulate function. This will hold onto any jobs that
+//can't allocate and wait until there is enough space to 
+//allocate them
+void checkWaitingQueue(
+    vector<int>& memory,
+    vector<Job>& waitingJobs,
+    vector<Event>& events,
+    string strategy,
+    int currentTime
+) {
+    //Loop to see the size of waitingJobs
+    for(int i = 0; i < waitingJobs.size(); i++) {
+
+        Job& job = waitingJobs[i];
+
+        //Checking to see if the waiting job can fit in the memory
+        //based on whatever algorithm is being used
+        int location = findLocation(memory, job.size, strategy);
+
+        //If the job can fit, this runs
+        if(location != -1) {
+
+            allocateJob(memory, job, location);
+
+            int waitingTime = currentTime - job.startTime;
+
+            //Output
+            cout << "Waiting job " << job.id
+                 << " allocated at page "
+                 << location << " after waiting "
+                 << waitingTime << " seconds." << endl;
+
+            //Creates a completion event
+            Event event;
+
+            //The interval starts when the job actually gets memory
+            event.time = currentTime + job.interval;
+
+            event.jobId = job.id;
+
+            events.push_back(event);
+
+            //Removes the job from the waiting queue
+            waitingJobs.erase(waitingJobs.begin() + i);
+
+            i--;
+        }
+    }
+}
+
 //Simulation function to replace original loops in main
 //This will make it easier to run repeated simulations without
 //bogging down the program
@@ -196,6 +247,9 @@ void simulate(const vector<Job>& jobs, string strategy) {
 
     //Keep track of jobs currently in memory
     vector<Event> events;
+
+    //Setting up vector for waiting jobs
+    vector<Job> waitingJobs;
 
     //Go through jobs in the order they appear in jobs.txt
     for(const Job& job : jobs) {
@@ -219,6 +273,9 @@ void simulate(const vector<Job>& jobs, string strategy) {
             }
         }
 
+        //Checks if any waiting jobs can be allocated
+        checkWaitingQueue(memory, waitingJobs, events, strategy, currentTime);
+
         cout << "Job " << job.id << " arrives." << endl;
 
         //Setting up location int to work with findLocation function
@@ -227,6 +284,15 @@ void simulate(const vector<Job>& jobs, string strategy) {
         if(location == -1) {
             cout << "Not enough contiguous memory for Job "
                  << job.id << "." << endl;
+
+            //If there isn't enough memory for a job, the 
+            //job is put into the waitingJobs queue and 
+            //is held onto until there is enough space
+            //for it to allocate
+            cout << "Job " << job.id
+                 << " added to waiting queue." << endl;
+
+            waitingJobs.push_back(job);    
         }
 
         else {
@@ -239,7 +305,9 @@ void simulate(const vector<Job>& jobs, string strategy) {
             //Calculate when the job finishes
             Event event;
 
-            event.time = job.startTime + job.interval;
+            //The job gets memory immediately, so its
+            //interval begins at the current time
+            event.time = currentTime + job.interval;
             event.jobId = job.id;
 
             events.push_back(event);
@@ -248,6 +316,55 @@ void simulate(const vector<Job>& jobs, string strategy) {
         printMemory(memory);
 
     }
+
+    //Continues the simulation after all the jobs have arrives.
+    //There may still be jobs in memory or waiting for memory
+    while(!events.empty() || !waitingJobs.empty()) {
+
+        //If there are waiting jobs but no events,
+        //there is nothing left that can free memory
+        if(events.empty()) {
+            cout << "\nNo more completion events." << endl;
+            cout << "Some jobs could not be allocated." << endl;
+            break;
+        }
+
+        //Finds the next event time
+        int nextTime = events[0].time;
+
+        for(const Event& event : events) {
+            if(event.time < nextTime) {
+                nextTime = event.time;
+            }
+        }
+
+        //Moves simulated time forward
+        int currentTime = nextTime;
+
+        cout << "\nTime " << currentTime << endl;
+
+        //Frees every job whose interval has ended
+        for(int i = 0; i < events.size(); i++) {
+            
+            if(events[i].time <= currentTime) {
+
+                cout << "Job " << events[i].jobId
+                     << " interval ended." << endl;
+
+                freeJob(memory, events[i].jobId);
+
+                events.erase(events.begin() + i);
+
+                i--;
+            }
+        }
+
+        //See if any waiting jobs can fit after
+        //memory has been freed
+        checkWaitingQueue(memory, waitingJobs, events, strategy, currentTime);
+    }
+
+    printMemory(memory);
 }
 
 int main() {
